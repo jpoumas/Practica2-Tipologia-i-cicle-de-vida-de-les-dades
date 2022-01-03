@@ -1,7 +1,7 @@
-Pràctica 2: Introducció a la neteja i anàlisi de dades 
+# Pràctica 2: Introducció a la neteja i anàlisi de dades 
 
-Equip format per:
+## Components de l'equip
 
 Xavier Badia Mulero - Josep Pou Mas
 
-Descripció dels fitxers
+## Descripció dels fitxers
