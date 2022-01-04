@@ -6,5 +6,7 @@ Xavier Badia Mulero - Josep Pou Mas
 
 ## Descripció dels fitxers
 
-Codi/XXX.rmd: Conté la implementació del codi R amb el que hem fet l'anàlisi de les dades.
+Codi/Neteja_analisi_dades.rmd:  Conté la implementació del codi R amb el que hem fet l'anàlisi de les dades.
+Codi/Neteja_analisi_dades.html: Conté el resultat de l'execució del codi R.
+
 
