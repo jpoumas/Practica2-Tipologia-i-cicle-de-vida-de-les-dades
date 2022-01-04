@@ -5,3 +5,6 @@
 Xavier Badia Mulero - Josep Pou Mas
 
 ## Descripció dels fitxers
+
+Codi/XXX.rmd: Conté la implementació del codi R amb el que hem fet l'anàlisi de les dades.
+
