@@ -10,4 +10,11 @@ Codi/Neteja_analisi_dades.rmd:  Conté la implementació del codi R amb el que h
 
 Codi/Neteja_analisi_dades.html: Conté el resultat de l'execució del codi R.
 
+Pràctica 2 - Tipologia i cicle de vida de les dades.pdf: Conté les respostes de les preguntes i els noms dels components del grup.
+
+winequality-red.csv: Conté el dataset inicial.
+
+winequality-red_result.csv: Conté el dataset amb les dades finals analitzades.
+
+
 
