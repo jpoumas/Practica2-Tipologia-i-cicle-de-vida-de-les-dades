@@ -1,0 +1,501 @@
+---
+title: "Pràctica 2. Tractament del dataset red wine quality"
+author: 'Josep Pou Mas - Xavier Badia Mulero'
+output:
+  html_document: 
+    toc: true     
+    toc_depth: 5   
+    toc_float:
+      
+      collapsed: false  
+      smooth_scroll: true
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+require(nortest)
+require(e1071)
+require(rpart.plot)
+
+library(ggplot2)
+library(dplyr)
+library(plyr)
+library(gridExtra)
+library(tidyr)
+library(htmlTable)
+library(DT)
+library(moments)
+library(nortest)
+library(corrplot)
+library(randomForest)
+library(caret)
+library(e1071)
+library(rpart)
+library(rpart.plot)
+
+```
+
+## 1-2. Descripció del dataset
+
+Llegim el fitxer de dades que conté tota la informació dels vins 
+```{r }
+
+# Seleccionem el directori on es troba els documents
+setwd("/Pràctica_2")
+
+# Llegim el dataset
+data_wine <- read.csv('winequality-red.csv', header = TRUE, sep = ",")
+
+```
+
+Visualitzem els sis primers registres del dataframe que presenta les dades del dataset d'entrada amb la informació.  
+
+```{r}
+
+head(data_wine)
+
+```
+
+Consultem el nombre de registres i columnes que formen el dataset.
+
+```{r}
+
+# Obtenim el total de resgistres i variables
+ dim(data_wine)
+
+```
+El dataset està format per 1599 registres i 13 variables
+
+
+## 3. Neteja de dades
+
+### 3.1. Elements buits i zeros
+
+```{r}
+
+# Nombre total de valors desconeguts de les variables
+sapply(data_wine, function(x) sum(is.na(x)))
+
+```
+
+```{r}
+
+# Nombre total de valors 0 de les variables
+sapply(data_wine, function(x) sum(x == 0))
+
+```
+
+### 3.2. Identificació i tractament de valors extrems
+
+
+```{r}
+
+par(mfrow=c(2,2))
+
+boxplot(data_wine$fixed.acidity, xlab="Acidesa fixa", col="blue", horizontal = TRUE, ylab = "Freq")
+boxplot(data_wine$volatile.acidity, xlab="Acidesa volàtil", col="blue", horizontal = TRUE, ylab = "Freq")
+boxplot(data_wine$citric.acid, xlab="Acidesa cítrica", col="blue", horizontal = TRUE, ylab = "Freq")
+boxplot(data_wine$residual.sugar, xlab="Sucre residual", col="blue", horizontal = TRUE, ylab = "Freq")
+boxplot(data_wine$chlorides, xlab="Clorur", col="blue", horizontal = TRUE, ylab = "Freq")
+boxplot(data_wine$free.sulfur.dioxide, xlab="Diòxid de sofre lliure", col="blue", horizontal=TRUE, ylab="Freq")
+boxplot(data_wine$total.sulfur.dioxide, xlab="Diòxid de sofre total", col="blue", horizontal=TRUE, ylab="Freq")
+boxplot(data_wine$density, xlab="Densiat", col="blue", horizontal = TRUE, ylab = "Freq")
+boxplot(data_wine$pH, xlab="pH" ,col="blue", horizontal = TRUE, ylab = "Freq")
+boxplot(data_wine$sulphates, xlab="Sulfats", col="blue", horizontal = TRUE, ylab = "Freq")
+boxplot(data_wine$alcohol, xlab="Alcohol", col="blue", horizontal = TRUE, ylab = "Freq")
+boxplot(data_wine$quality, xlab="Qualitat", col="blue", horizontal = TRUE, ylab = "Freq")
+
+
+```
+
+Analitzem de forma detallada les variables més representatives a l'hora de valorar la qualitat del vi. Podem visualitzar de forma més clara els valors atípics si utilitzem la funció Boxplot.Stats. Presentem els casos per a l'acidesa cítrica, el sulfat i l'alcohol.
+
+
+**Acidesa cítrica**
+
+```{r}
+
+summary(data_wine$citric.acid)
+
+```
+```{r}
+
+boxplot.stats(data_wine$citric.acid)$out
+
+```
+Analitzem de forma detallada les variables més representatives a l’hora de valorar la qualitat del vi. Podem visualitzar de forma més clara els valors atípics si utilitzem la funció Boxplot.Stats. 
+
+**sulfat**
+
+El valors extrem màxim dels sulfats és 2. Aquesta variable s'utilitza com a conservant i antioxidant.  
+
+```{r}
+
+summary(data_wine$sulphates)
+
+```
+```{r}
+
+boxplot.stats(data_wine$sulphates)$out
+
+```
+
+**pH**
+
+```{r}
+
+summary(data_wine$pH)
+
+```
+```{r}
+
+boxplot.stats(data_wine$pH)$out
+
+```
+
+**Alcohol**
+
+```{r}
+
+summary(data_wine$alcohol)
+
+```
+```{r}
+
+boxplot.stats(data_wine$alcohol)$out
+
+```
+
+### 4. Anàlisi de dades
+
+#### 4.1. Selecció dels grups de dades que es volen analitzar/comparar
+
+Seleccionem la qualitat del vi envers la graduació de l'alcohol
+
+```{r}
+
+vi_qualitat_alta <- data_wine$alcohol[data_wine$quality >= 7]
+vi_qualitat_baixa <- data_wine$alcohol[data_wine$quality < 7]
+
+```
+
+
+#### 4.2. Comprovació de la normalitat i homogeneïtat de la variància.
+
+**Comprovació de la normalitat**
+
+```{r}
+
+variables <- colnames(data_wine)[1:11]
+
+par(mfrow = c(2,2))
+
+for(variable in variables){
+  print(paste0("Nom de la variable: ", variable))
+  print(paste0("P-valor: ", shapiro.test(data_wine[,variable])$p.value))
+}
+
+
+for(variable in variables){
+  qqnorm(data_wine[,variable], main = paste0(variable), col = "blue")
+  qqline(data_wine[,variable])
+}
+
+```
+
+**homogeneïtat de la variància**
+
+Per comprovar l’homogeneïtat de la variància entre dues mostres, aplicarem la funció que ve donada en R var.test
+
+```{r}
+
+var.test(x = vi_qualitat_alta, y = vi_qualitat_baixa)
+
+```
+Podem observar que el ratio of variances té el valor 1,059625 i cau dintre de l’interval de confiança del 95% (rang entre 0,871 i 1,3083). També es pot observar que el p-value té el valor 0,5562 i és més gran de 0,05, per tant, no hi ha diferència significativa entre les variàncies dels dos grups.    
+
+#### 4.3. Aplicació de proves estadístiques per comparar els grups de dades. correlacions, regressions, etc. Aplicar almenys tres mètodes d’anàlisi diferents.
+
+**contrast d’hipòtesis**
+
+```{r}
+
+# t de Student
+t.test(vi_qualitat_alta, vi_qualitat_baixa, # les dos mostres
+       alternative = "greater",  # contrast per resta de mitjanes
+       paired = FALSE,  # mostres independents
+       var.equal = TRUE, #
+       conf.level = 0.95)
+
+
+```
+El resultat del contrast d’hipòtesis dóna un p-valor més petit que 0.05, que és el nivell d’acceptació, i també veiem que no cau dintre de l’interval d’acceptació de la hipòtesi nul·la, llavors ens porta a rebutjar la hipòtesi nul·la, per tant, acceptem la hipòtesi alternativa i podem dir que els vins de bona qualitat tenen en mitjana una graduació superior que els vins de més baixa qualitat.
+
+
+**Correlacions**
+
+Per calcular les correlacions entre les variables utilitzem la funció anomenada cor(), i ho representem de forma gràfica amb la funció corrplot().
+
+```{r}
+
+rcor <- cor(data_wine, use="pairwise.complete.obs", method = "pearson")
+rcor
+
+```
+
+
+```{r}
+
+corrplot(rcor, type = "upper", tl.col = "black", method = "circle", tl.srt = 45) 
+
+```
+
+En el gràfic de correlacions resultant, els cercles més grans i de més intensitat ens indiquen un grau de correlació més alt entre les dues variables i els més petits i de menys intensitat un grau de correlació més baix.
+
+Es pot observar en aquest gràfic que la correlació més gran que hi ha en referència a la variable Quality és amb les variables alcohol i acidesa volàtil.
+
+
+**Regression linial Múltiple**
+
+```{r}
+
+
+rl1 <- lm(quality ~ alcohol, data = data_wine)
+rl2 <- lm(quality ~ alcohol + volatile.acidity, data = data_wine)
+rl3 <- lm(quality ~ alcohol + volatile.acidity + citric.acid, data = data_wine)
+rl4 <- lm(quality ~ alcohol + volatile.acidity + citric.acid + pH, data = data_wine)
+rl5 <- lm(quality ~ alcohol + volatile.acidity + citric.acid + pH + sulphates, data = data_wine)
+
+
+```
+
+Pels models de regressió lineal múltiple obtinguts, podem utilitzar el coeficient de determinació per a mesurar la bondat dels ajustos i quedar-nos amb aquell model que millor coeficient presenta.
+
+```{r}
+
+# Taula dels coeficients de determinació de cada model de regressió
+coeficients <- matrix(c(1, summary(rl1)$r.squared,
+                               2, summary(rl2)$r.squared,
+                               3, summary(rl3)$r.squared,
+                               4, summary(rl4)$r.squared,
+                               5, summary(rl5)$r.squared),
+                      ncol = 2, byrow = TRUE)
+
+colnames(coeficients) <- c("model regresió lineal", "Coeficient de determinació")
+coeficients
+
+```
+
+**Random Forest**
+
+Passem a crear una nova variable data_wine$quality que ha d'emmagatzemar l'agrupació dels vins segons la seva qualitat: Bo, Normal i Bo. A continuació, dividim les dades en dos dataframe nous: un amb les dades d'entrenament (70% de les dades del dataset), i les dades de test (30% de les dades del dataset).
+
+```{r}
+
+# Agrupem la qualitat dels vins a una nova variable
+data_wine$nivell.qualitat <- ifelse(data_wine$quality < 5, "Dolent", "Bo")
+data_wine$nivell.qualitat[data_wine$quality == 5 | data_wine$quality == 6] <- "Normal"
+data_wine$nivell.qualitat <- as.factor(data_wine$nivell.qualitat)
+
+# Convertim en factor la variable creada
+data_wine$nivell.qualitat <- as.factor(data_wine$nivell.qualitat)
+
+# Seed inicialitza el generador de nombres aleatoris que utilitzarem per separar les dades en train i test.
+# Utilitzant un seed fixe, ens assegurem de generar el mateix conjunt de dades i els resultats són reproduïbles
+set.seed(1234)  
+
+# Dividim el dataframe en 70% entrenament i 30% validació 
+index <- sample(2, nrow(data_wine), replace=TRUE, prob=c(0.7, 0.3))
+train_data_wine <- data_wine[index==1,]
+test_data_wine <- data_wine[index==2,]
+
+```
+
+Seguidament, utilitzem el mètode supervisat de classificació randomForest que a partir dels resultats obtinguts mitjançant el càlcul de n arbres, construeix el resultat de l'estimació que volem obtenir.
+
+
+```{r}
+
+set.seed(12)
+
+#Declarem la funció de l'arbre
+ArbrelRF <- nivell.qualitat ~ alcohol + volatile.acidity + citric.acid + pH + sulphates
+
+# #Apliquem l'algoritme
+model_random_forest <- randomForest(ArbrelRF, data = train_data_wine, ntree=100, proximity= T, nodesize=5) #indiquem el nombre d'arbres mitjançant ntree = 500
+
+# #Obtenim la importancia de cada variable en el procés de clasificació
+importance(model_random_forest)      #Importancia de las variables en formato text
+
+```
+
+
+
+
+```{r}
+
+varImpPlot(model_random_forest) #Importancia de las variables en formato gráfico
+
+```
+```{r}
+
+# Validem la capacitat de predicció de l'arbre amb el fitxer de validació.
+preds_random_forest <- predict(model_random_forest, newdata = test_data_wine)
+table(preds_random_forest, test_data_wine$nivell.qualitat)
+
+```
+```{r}
+
+# Calculem el % d'encerts 
+sum(preds_random_forest == test_data_wine$nivell.qualitat)/ length(test_data_wine$nivell.qualitat) * 100
+
+```
+L'arbre de decisió obtingut mitjançant el paquet randomForest classifica correctament un 86,02% dels registres. Un resultat no massa alt però acceptable.
+
+
+**Arbre de decisió**
+
+Per a construir un arbre de decisions és necessari definir una funció que relacioni una variable categòrica dependent (factor) amb n variables que poden ser categòriques o numèriques. En el nostre cas treballarem amb: 
+
+1 variable factor dependent -> nivell.qualitat
+
+5 variables independents -> alcohol, volatile.acidity, citric.acid, pH, sulphates
+
+L'algoritme de classificació busca quina és la variable que permet obtenir una submostra més diferenciada per la variable dependent (nivell.qualitat), i identificar també quins intervals (si la variable és quantitativa) o agrupació de categories de les variables independents permetran maximitzar aquesta divisió.
+
+Estudiem a continuació la capacitat predictiva de l'arbre de decisió simple obtingut mitjançant el paquet rpart. Utilitzarem les dades d'entrenament i test obtingudes en l'apartat del model Random Forest.
+
+```{r}
+
+# Declarem la funció de l'arbre
+ArbreRpart = nivell.qualitat ~ alcohol + volatile.acidity + citric.acid + pH + sulphates
+#Apliquem l'algoritme
+model_tree = rpart(ArbreRpart, method="class", data=train_data_wine)
+# Validem la capacitat de predicció de l'arbre amb el fitxer de validació
+preds_tree <- predict(model_tree, newdata = test_data_wine, type = "class")
+# Visualitzem una matriu de confusió
+table(preds_tree, test_data_wine$nivell.qualitat)
+
+```
+```{r}
+
+# Calcula el % d'encerts 
+sum(preds_tree == test_data_wine$nivell.qualitat)/ length(test_data_wine$nivell.qualitat)*100
+```
+El model obtingut amb el paquet rpart presenta una classificació d'un 85,37% dels registres, un resultat alt i acceptable. Ha realitzat una predicció de 28 vins com a bons, i 32 com a vins normals.
+
+```{r}
+
+rpart.plot(model_tree)
+
+```
+
+
+### 5. Representació dels resultats a partir de taules i gràfiques
+
+**Arbre de decisions**
+
+
+
+```{r}
+
+rpart.plot(model_tree)
+
+
+
+```
+
+**Gràfiques**
+
+```{r}
+
+n_nivell.qualitat <- dplyr::count(data_wine, nivell.qualitat)
+
+ggplot(data = n_nivell.qualitat, aes(nivell.qualitat , n, fill = nivell.qualitat)) + 
+  geom_bar(stat="identity") + 
+  geom_text(aes(label=n), vjust=1.6, color="white",position = position_dodge(0.9), size=3.5) +
+  xlab("Nivell de qualitat") + ylab("Total") + ggtitle("Nombre d'elements per nivell de qualitat") + 
+  theme(axis.text.x = element_text(angle = 0, size = 10, hjust = 1, vjust = 1))
+
+```
+
+
+
+
+```{r}
+
+ggplot(data_wine, aes(x=nivell.qualitat, y=alcohol, fill=nivell.qualitat)) + 
+  ggtitle("Qualitat en funció l'alcohol") +
+  geom_violin()
+
+```
+
+Segons els experts, el grau d’alcohol no és un condicionant de la qualitat del vi, no obstant això, en aquesta ocasió podem veure que els vins de qualitat alta tendeixen a tenir un grau d’alcohol major, però estan distribuïts en un rang aproximadament entre 9º i 14º.
+
+```{r}
+
+ggplot(data_wine, aes(x=nivell.qualitat, y=volatile.acidity, fill=nivell.qualitat)) +
+  ggtitle("Qualitat en funció l'acidesa volàtil") +
+  geom_violin()
+
+```
+
+L’acidesa volàtil afecta el sabor del vi, per aquest motiu és important que el seu valor sigui baix. Podem veure que els vins de qualitat més alta (Bo) tendeixen a tenir una acidesa volàtil més baixa.
+
+```{r}
+
+ggplot(data_wine, aes(x=nivell.qualitat, y=pH, fill=nivell.qualitat)) +
+  ggtitle("Qualitat en funció el pH") +
+  geom_violin()
+
+
+```
+
+En aquest gràfic podem veure com els vins etiquetats com a Bo tendeixen a presentar més dades al voltant del valor de pH 3,25.
+
+```{r}
+
+ggplot(data_wine, aes(x=nivell.qualitat, y=sulphates, fill=nivell.qualitat)) +
+  ggtitle("Qualitat en funció del sulfat") +
+  geom_violin()
+
+```
+Els vins de qualitat més bona, en general presenten una quantitat de sulfat més gran que els vins de menys qualitat. Aquest element s’utilitza com a conservant i antioxidant. 
+
+```{r}
+
+ggplot(data_wine, aes(x=nivell.qualitat, y=density, fill=nivell.qualitat)) +
+  ggtitle("Qualitat en funció la densitat") +
+  geom_violin()
+
+
+```
+
+Els vins etiquetats com a bons presenten una densitat més baixa que els etiquetats com a dolents o normal. 
+
+
+### 7. Codi.
+
+
+```{r}
+
+data_wine_result <- dplyr::select(data_wine, 
+                                  volatile.acidity, 
+                                  citric.acid, 
+                                  alcohol, 
+                                  pH, 
+                                  sulphates, 
+                                  quality, 
+                                  nivell.qualitat)
+
+
+write.csv(data_wine_result, "winequality-red_result.csv", row.names = FALSE)
+
+```
+
+
+
+
